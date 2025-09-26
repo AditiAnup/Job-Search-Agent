@@ -1,10 +1,12 @@
 import asyncio
 import streamlit as st
-from jobScraper import scrape_jobs, analyze_jobs
+from jobScraper import scrape_jobs, display_jobs, analyze_jobs, filter_jobs
 from Nav_bar import Nav_bar
+from database import init_db, save_jobs_to_db
 
 Nav_bar()
 
+init_db()
 # Store the session state
 if "jobs" not in st.session_state:
     st.session_state["jobs"] = []
@@ -22,14 +24,22 @@ experience_years = st.number_input("Years of Experience", min_value=0, max_value
 
 if st.button("Search Jobs"):
     with st.spinner("Scraping job postings..."):
-        st.session_state["jobs"] = asyncio.run(scrape_jobs(job_title, location, skills, pages=3))
+        raw_jobs = asyncio.run(scrape_jobs(job_title, location, skills, pages=3))
 
-    st.success(f"✅ Found {len(st.session_state['jobs'])} jobs.")
+    # Filter
+    filtered_jobs = filter_jobs(raw_jobs, job_title, skills, experience_years)
+    save_jobs_to_db(filtered_jobs)
+    st.session_state["jobs"] = filtered_jobs
+
+    st.success(f"✅ Found {len(filtered_jobs)} filtered jobs.")
+    display_jobs(filtered_jobs, limit=30)
 
     with st.spinner("Analyzing jobs with AI..."):
-        st.session_state["analysis"] = asyncio.run(
-            analyze_jobs(st.session_state["jobs"], job_title, location, experience_years, skills)
-        )
+        final_analysis = asyncio.run(analyze_jobs(filtered_jobs, job_title, location, experience_years, skills))
+
+    st.subheader("📄 Final Job Analysis")
+    st.markdown(final_analysis)
+
 
 # Job selection tiles
 if st.session_state["jobs"]:

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from dotenv import load_dotenv
 from firecrawl import FirecrawlApp
 from openai import OpenAI
+import re
 
 
 # Load environment variables
@@ -146,45 +147,80 @@ async def analyze_jobs(jobs: List[Dict], job_title: str, location: str, experien
 
     return response.output_text
 
+def filter_jobs(jobs, job_title, skills, experience_years):
+    results = []
+    job_title_keywords = [w.lower() for w in job_title.split() if len(w) > 2]
+    skills = [s.strip().lower() for s in skills if s.strip()]
+
+    for job in jobs:
+        title = (job.get("job_title") or "").lower()
+        desc = (job.get("description") or "").lower()
+        exp_text = (job.get("experience") or "").lower()
+
+        # --- Title Score ---
+        title_score = sum(1 for k in job_title_keywords if k in title)
+
+        # --- Skill Score ---
+        skill_score = sum(1 for s in skills if s in desc)
+
+        # --- Experience Check (soft) ---
+        exp_ok = True
+        exp_match = re.findall(r"(\d+)\+?\s*year", exp_text)
+        if exp_match:
+            required_years = int(exp_match[0])
+            exp_ok = required_years <= (experience_years + 3)  # allow tolerance
+
+        # Keep all jobs but rank them
+        results.append({
+            **job,
+            "title_score": title_score,
+            "skill_score": skill_score,
+            "exp_ok": exp_ok
+        })
+
+    # Sort by: title relevance > skill match > experience
+    results = sorted(
+        results,
+        key=lambda j: (j["title_score"], j["skill_score"], j["exp_ok"]),
+        reverse=True
+    )
+
+    print(f"✅ After ranking: showing top {len(results)} of {len(jobs)} scraped jobs")
+    return results
+
+
+
+
 # Analyze selected job
-async def analyze_single_job(job: Dict) -> str:
-    """
-    Analyze a single job posting in detail.
-    Summarize skills, company info, hiring trends, and visa sponsorship.
-    """
-    job_title = job.get("job_title", "")
-    company = job.get("company", "")
-    location = job.get("location", "")
-    description = job.get("description", "")
+async def analyze_single_job(job: dict, skills: list) -> str:
+    if not job:
+        return "⚠️ No job selected."
+
+    jd_text = job.get("description", "No description available.")
+    company = job.get("company", "Unknown company")
+    job_title = job.get("job_title", "Unknown role")
 
     analysis_prompt = f"""
-    You are an expert career analyst. A candidate is considering a job.
+    You are a career coach and research assistant.
+    
+    Analyze the following job:
 
-    --- JOB POSTING ---
-    Title: {job_title}
-    Company: {company}
-    Location: {location}
-    Description: {description}
+    **Job Title:** {job_title}  
+    **Company:** {company}  
+    **Location:** {job.get("location", "N/A")}  
+    **Experience:** {job.get("experience", "N/A")}  
+    **Compensation:** {job.get("compensation", "N/A")}  
 
-    Provide the following structured response:
+    **Job Description:**  
+    {jd_text}
 
-    🏢 COMPANY SNAPSHOT
-    • Brief summary of what this company does, its industry, and reputation.
+    Please provide:
 
-    📊 HIRING TRENDS
-    • Has the company been hiring or laying off recently?
-    • Approximate number of hires in the past few months (if known).
-
-    🌍 VISA SPONSORSHIP
-    • Does this company sponsor H-1B or OPT visas?
-    • Any history of international hires?
-
-    🛠️ SKILLS & REQUIREMENTS
-    • Key skills this job is looking for
-    • Experience levels required
-
-    💡 TAKEAWAY
-    • Is this role worth applying to?
+    🔑 **Key Skills & Technologies** the company is looking for  
+    🏢 **About the Company** (size, reputation, domain, etc.)  
+    📈 **Hiring Trends** (how many people hired recently, growth signals)  
+    🌍 **Visa Sponsorship** (if any public data suggests this company sponsors visas)  
+    💡 **Recommendations** for tailoring my resume to this role
     """
 
     response = client.responses.create(
@@ -194,3 +230,4 @@ async def analyze_single_job(job: Dict) -> str:
     )
 
     return response.output_text
+

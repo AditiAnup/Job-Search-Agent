@@ -35,17 +35,7 @@ else:
             raw_analysis = analyze_resume(resume_text, jd_text)
 
             # ---- Formatting Trick ----
-            st.markdown("### ✅ Matched Skills")
-            st.info("These are the skills from your resume that match the job description (AI-detected).")
-            st.write("• Placeholder for matched skills extracted from analysis")
-
-            st.markdown("### ⚠️ Missing Skills")
-            st.warning("These are the important skills from the job description missing in your resume.")
-            st.write("• Placeholder for missing skills extracted from analysis")
-
-            st.markdown("### 📈 Recommendations")
-            st.success("Tailored suggestions to improve your resume for this job.")
-            st.write("• Placeholder for AI-generated recommendations")
+            
 
             # For debugging: show the full raw text at bottom (can hide later)
             with st.expander("🔎 Full AI Analysis"):
