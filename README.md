@@ -25,6 +25,7 @@ In short, this project serves as a personal AI job search assistant that identif
 - SQLite
 
 ## Project Structure
+```
 .
 |-- app.py
 |-- jobScraper.py
@@ -35,6 +36,7 @@ In short, this project serves as a personal AI job search assistant that identif
 |-- database.py
 |-- requirements.txt
 |-- README.md
+```
 
 ## Installation & Setup
 1. **Clone the repository**
