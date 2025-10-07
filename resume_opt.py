@@ -24,7 +24,7 @@ def extract_resume_text(file_path: str) -> str:
         raise ValueError("Unsupported file format. Upload PDF, DOCX, or TXT.")
     return text.strip()
 
-# Resume Optimization
+# Resume Optimization function 
 def analyze_resume(resume_text: str, job_description: str) -> str:
     prompt = f"""
     You are a career coach. Compare the following resume to the job description. 

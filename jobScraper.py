@@ -106,37 +106,61 @@ def display_jobs(jobs: List[Dict], limit: int = 30):
 
 
 # AI Analysis Function
-async def analyze_jobs(jobs: List[Dict], job_title: str, location: str, experience_years: int, skills: List[str]) -> str:
-    """Analyzes and ranks job postings using OpenAI GPT."""
-    if not jobs:
-        return "⚠️ No job listings found. Try adjusting your search."
+FEEDBACK_FILE = "agent_feedback.txt"
+
+async def analyze_jobs(jobs, job_title, location, experience_years, skills):
+    if not jobs or len(jobs) == 0:
+        print("⚠️ No jobs found initially. Retrying scrape...")
+        try:
+            jobs = await scrape_jobs(job_title, location, skills, pages=2)
+        except Exception as e:
+            return f"❌ Failed to rerun job search: {e}"
+
+        if not jobs:
+            return "⚠️ Still no job listings found after retry. Try adjusting your search."
+
+
+    feedback_memory = ""
+    if os.path.exists(FEEDBACK_FILE):
+        with open(FEEDBACK_FILE, "r", encoding="utf-8") as f:
+            feedback_memory = f.read().strip()
+
+    memory_context = (
+        f"\nUser Preferences from past feedback:\n{feedback_memory}\n"
+        if feedback_memory else "\n(No prior feedback provided yet.)\n"
+    )
 
     analysis_prompt = f"""
-    You are a career coach. Analyze these job opportunities:
+    You are an AI job analysis agent and career coach.
 
+    {memory_context}
+
+    Analyze the following job listings and tailor your insights
+    according to the user's preferences and feedback memory.
+
+    **Job Title to Match:** {job_title}
+    **Preferred Location:** {location}
+    **Experience Level:** {experience_years} years or less
+    **Key Skills:** {", ".join(skills)}
+
+    JOB DATA:
     {jobs}
 
-    Filter for:
-    - Title related to {job_title}
-    - Location near {location}
-    - Experience <= {experience_years} years
-    - Skills: {", ".join(skills)}
+    Please structure your analysis into clear sections:
 
-    Provide your response in sections:
+    💼 **SELECTED JOB OPPORTUNITIES**
+    • List 10 best-matching roles with title, company, and location.
 
-    💼 SELECTED JOB OPPORTUNITIES
-    • List 10 best matching jobs with Job Title, Company, Location, Experience, Compensation
+    🔍 **SKILLS MATCH ANALYSIS**
+    • Compare how well the user's skills align with job requirements.
 
-    🔍 SKILLS MATCH ANALYSIS
-    • Compare jobs on skills match, experience, and growth potential
+    💡 **RECOMMENDATIONS**
+    • Highlight top 3 roles based on the user's preferences and growth potential.
+    • Indicate why each role stands out given the feedback memory.
 
-    💡 RECOMMENDATIONS
-    • Top 3 jobs with reasoning
-    • Career growth potential
-
-    📝 APPLICATION TIPS
-    • Resume customization tips
-    • Application strategies
+    🧭 **NEXT STEPS**
+    • Personalized advice on refining search or resume based on observed trends.
+    • Suggest new skills or certifications aligned with their interests.
     """
 
     response = client.responses.create(
@@ -157,20 +181,16 @@ def filter_jobs(jobs, job_title, skills, experience_years):
         desc = (job.get("description") or "").lower()
         exp_text = (job.get("experience") or "").lower()
 
-        # --- Title Score ---
         title_score = sum(1 for k in job_title_keywords if k in title)
 
-        # --- Skill Score ---
         skill_score = sum(1 for s in skills if s in desc)
 
-        # --- Experience Check (soft) ---
         exp_ok = True
         exp_match = re.findall(r"(\d+)\+?\s*year", exp_text)
         if exp_match:
             required_years = int(exp_match[0])
-            exp_ok = required_years <= (experience_years + 3)  # allow tolerance
+            exp_ok = required_years <= (experience_years + 3) 
 
-        # Keep all jobs but rank them
         results.append({
             **job,
             "title_score": title_score,
@@ -178,7 +198,6 @@ def filter_jobs(jobs, job_title, skills, experience_years):
             "exp_ok": exp_ok
         })
 
-    # Sort by: title relevance > skill match > experience
     results = sorted(
         results,
         key=lambda j: (j["title_score"], j["skill_score"], j["exp_ok"]),
@@ -230,4 +249,3 @@ async def analyze_single_job(job: dict, skills: list) -> str:
     )
 
     return response.output_text
-

@@ -15,7 +15,7 @@ else:
     st.write(f"💰 {job.get('compensation', 'N/A')}")
     st.write(f"[🔗 Job Link]({job.get('link')})")
 
-    # Resume upload
+    # Upload resume
     uploaded_resume = st.file_uploader("Upload Resume (PDF/DOCX/TXT)", type=["pdf", "docx", "txt"])
 
     if uploaded_resume and st.button("⚡ Optimize Resume"):
@@ -31,12 +31,7 @@ else:
         else:
             st.subheader("📌 Resume Optimization Results")
 
-            # Call AI resume analyzer
-            raw_analysis = analyze_resume(resume_text, jd_text)
+            raw_analysis = analyze_resume(resume_text, jd_text)            
 
-            # ---- Formatting Trick ----
-            
-
-            # For debugging: show the full raw text at bottom (can hide later)
             with st.expander("🔎 Full AI Analysis"):
                 st.markdown(raw_analysis)

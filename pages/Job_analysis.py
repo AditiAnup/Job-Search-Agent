@@ -12,7 +12,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 
-# Analysis function (single job)
+# Analysis function (selected job)
 async def analyze_single_job(job: dict, skills: list) -> str:
     if not job:
         return "⚠️ No job selected."
